@@ -3,10 +3,10 @@ use warnings FATAL => 'all';
 
 package SVN::Agent;
 use base 'Class::Accessor';
-__PACKAGE__->mk_accessors('path');
+__PACKAGE__->mk_accessors('path', 'changes');
 use Carp;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 =head1 NAME
 
@@ -64,6 +64,12 @@ given by C<path> option.
 
 =cut
 
+sub new {
+	my $self = shift()->SUPER::new(@_);
+	$self->changes([]) unless $self->changes;
+	return $self;
+}
+
 sub load {
 	my $self = shift()->new(@_);
 	$self->_load_status;
@@ -105,6 +111,11 @@ sub deleted { return shift()->{D} || []; }
 
 Returns array of files which are missing from the working directory.
 
+=head2 changes
+
+Returns array of files which are changes for the next commit. Note that
+you can also modify this array to change next commit files.
+
 =cut
 
 sub missing { return shift()->{'!'} || []; }
@@ -122,21 +133,50 @@ sub add {
 	my $res = '';
 	for (split('/', $file)) {
 		$p .= "/$_";
-		next if -d "$p/.svn";
-		$res .= $self->_svn_command('add', $p);
+		my $r = join('', $self->_svn_command('add -N', $p));
+		next if $r =~ /already under version/;
+		$res .= $r;
+		push @{ $self->changes }, $p;
 	}
 	return $res;
 }
 
+=head2 prepare_changes
+
+Rolls modified, added and deleted arrays into changes array.
+
+=cut
+
+sub revert {
+	return shift()->_svn_command("revert", @_);
+}
+
+=head2 prepare_changes
+
+Rolls modified, added and deleted arrays into changes array.
+
+=cut
+
+sub prepare_changes {
+	my $self = shift;
+	push @{ $self->changes }, @{ $self->$_ }
+		for qw(modified added deleted);
+}
+
 =head2 commit MESSAGE
 
-Commits current changes using MESSAGE as a log message.
+Commits current changes using MESSAGE as a log message. The changes should
+be listed in the changes array.
 
 =cut
 sub commit {
 	my ($self, $msg) = @_;
 	die "No message given" unless $msg;
-	return $self->_svn_command('commit -m', $msg);
+	my $ch = $self->changes;
+	confess "Empty commit" unless @$ch;
+	my $res = $self->_svn_command('commit -m', $msg, @$ch);
+	$self->changes([]);
+	return $res;
 }
 
 =head2 update
@@ -152,7 +192,12 @@ Schedules FILE for removal. Note, that it doesn't physically removes the file
 from the working directory.
 
 =cut
-sub remove { shift()->_svn_command('remove', @_); }
+sub remove {
+	my ($self, $file) = @_;
+	my $res = $self->_svn_command('remove', $file);
+	push @{ $self->changes }, $file;
+	return $res;
+}
 
 =head2 diff FILE
 
