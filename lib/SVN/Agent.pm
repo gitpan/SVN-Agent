@@ -6,7 +6,7 @@ use base 'Class::Accessor';
 __PACKAGE__->mk_accessors('path', 'changes');
 use Carp;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 
 =head1 NAME
 
