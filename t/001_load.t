@@ -1,7 +1,7 @@
 use strict;
 use warnings FATAL => 'all';
 
-use Test::More tests => 54;
+use Test::More tests => 55;
 use File::Temp qw(tempdir);
 use File::Slurp;
 
@@ -103,7 +103,8 @@ ok(-f "$td/co/f2.txt");
 unlink("$td/co/f2.txt") or die "Unable to unlink f2.txt";
 $object->remove("f2.txt");
 is_deeply($object->changes, [ 'f2.txt' ]);
-$object->commit("Removed f2.txt");
+is_deeply([ $object->commit("Removed f2.txt") ], [ "Deleting       f2.txt\n"
+	, "\n", "Committed revision 5.\n" ]);
 
 $res = `svn checkout file://$td/svn_root $td/co3 2>&1`;
 like($res, qr/Checked out/);

@@ -6,7 +6,7 @@ use base 'Class::Accessor';
 __PACKAGE__->mk_accessors('path', 'changes');
 use Carp;
 
-our $VERSION = 0.03;
+our $VERSION = 0.04;
 
 =head1 NAME
 
@@ -50,7 +50,8 @@ sub _load_status {
 	my $self = shift;
 	foreach ($self->_svn_command('status')) {
 		chomp;
-		/^(.).{6}(.+)$/;
+		# on Leopard we may have additional space before filename
+		/^(.).{6}\s?(.+)$/;
 		push @{ $self->{$1} }, $2;
 	}
 }
@@ -141,9 +142,9 @@ sub add {
 	return $res;
 }
 
-=head2 prepare_changes
+=head2 revert
 
-Rolls modified, added and deleted arrays into changes array.
+Runs revert command.
 
 =cut
 
@@ -166,7 +167,7 @@ sub prepare_changes {
 =head2 commit MESSAGE
 
 Commits current changes using MESSAGE as a log message. The changes should
-be listed in the changes array.
+be listed in the changes array. Returns list of the output lines.
 
 =cut
 sub commit {
@@ -174,9 +175,9 @@ sub commit {
 	die "No message given" unless $msg;
 	my $ch = $self->changes;
 	confess "Empty commit" unless @$ch;
-	my $res = $self->_svn_command('commit -m', $msg, @$ch);
+	my @res = $self->_svn_command('commit -m', $msg, @$ch);
 	$self->changes([]);
-	return $res;
+	return @res;
 }
 
 =head2 update
